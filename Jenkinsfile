@@ -14,7 +14,7 @@ pipeline {
     // Database details (RDS)
     DB_NAME = "ecommjava"
     DB_USER = "admin"
-    DB_PASS = "Admin12345!"  // valid password
+    DB_PASS = "Admin123!"  // valid password
     DB_ENDPOINT = "terraform-20251202122328798100000001.cdwkuiksmrsm.ap-south-1.rds.amazonaws.com:3306"
 }
 
