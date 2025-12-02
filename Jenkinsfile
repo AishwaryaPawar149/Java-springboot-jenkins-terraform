@@ -2,20 +2,22 @@ pipeline {
     agent any
 
     environment {
-        PROJECT_NAME = "E-commerce-project-springBoot"
-        GITHUB_REPO_URL = "https://github.com/AishwaryaPawar149/Java-springboot-jenkins-terraform.git"
+    // Project details
+    PROJECT_NAME = "E-commerce-project-springBoot"
+    GITHUB_REPO_URL = "https://github.com/AishwaryaPawar149/Java-springboot-jenkins-terraform.git"
 
-        # EC2 details
-        EC2_USER = "ubuntu"
-        EC2_IP   = "65.1.86.61"
-        EC2_APP_DIR = "/home/ubuntu/app"
+    // EC2 details
+    EC2_USER = "ubuntu"
+    EC2_IP   = "65.1.86.61"
+    EC2_APP_DIR = "/home/ubuntu/app"
 
-        # Database details (RDS)
-        DB_NAME = "ecommjava"
-        DB_USER = "admin"
-        DB_PASS = "Admin123"  // valid password
-        DB_ENDPOINT = "terraform-20251202122328798100000001.cdwkuiksmrsm.ap-south-1.rds.amazonaws.com:3306"
-    }
+    // Database details (RDS)
+    DB_NAME = "ecommjava"
+    DB_USER = "admin"
+    DB_PASS = "Admin12345!"  // valid password
+    DB_ENDPOINT = "terraform-20251202122328798100000001.cdwkuiksmrsm.ap-south-1.rds.amazonaws.com:3306"
+}
+
 
     stages {
 
