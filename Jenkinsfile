@@ -7,17 +7,17 @@ pipeline {
         GITHUB_REPO_URL = "https://github.com/AishwaryaPawar149/Java-springboot-jenkins-terraform.git"
         
         // Spring Boot project directory
-        APP_DIR = "JtProject"  // Add this - the subdirectory containing pom.xml
+        APP_DIR = "JtProject"  // The subdirectory containing pom.xml
 
-        // EC2 details
-        EC2_USER = "ubuntu"
+        // EC2 details - Amazon Linux with ec2-user
+        EC2_USER = "ec2-user"  // Changed from ubuntu to ec2-user
         EC2_IP   = "65.1.86.61"
-        EC2_APP_DIR = "/home/ubuntu/app"
+        EC2_APP_DIR = "/home/ec2-user/app"  // Changed path for ec2-user
 
         // Database details (RDS)
         DB_NAME = "ecommjava"
         DB_USER = "admin"
-        DB_PASS = "Admin123!"
+        DB_PASS = "Admin123"
         DB_ENDPOINT = "terraform-20251202122328798100000001.cdwkuiksmrsm.ap-south-1.rds.amazonaws.com:3306"
     }
 
@@ -68,25 +68,21 @@ pipeline {
                 scp -o StrictHostKeyChecking=no ${APP_DIR}/target/*.jar ${EC2_USER}@${EC2_IP}:${EC2_APP_DIR}/app.jar
                 scp -o StrictHostKeyChecking=no ${APP_DIR}/deploy/application.properties ${EC2_USER}@${EC2_IP}:${EC2_APP_DIR}/application.properties
 
-                # Install Java if missing & setup systemd service
+                # Install Java and setup systemd service on Amazon Linux
                 ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_IP} <<'ENDSSH'
-                # Check if running on Amazon Linux or Ubuntu and install appropriate Java
-                if command -v yum &> /dev/null; then
-                    sudo yum install java-11-openjdk -y || true
-                elif command -v apt-get &> /dev/null; then
-                    sudo apt-get update
-                    sudo apt-get install openjdk-11-jdk -y || true
-                fi
+                # Install Java 11 on Amazon Linux
+                sudo yum install java-11-amazon-corretto -y || sudo yum install java-11-openjdk -y
 
+                # Create systemd service for Spring Boot app
                 sudo bash -c 'cat > /etc/systemd/system/springboot-app.service <<EOL
 [Unit]
 Description=Spring Boot E-commerce App
 After=network.target
 
 [Service]
-User=ubuntu
-WorkingDirectory=/home/ubuntu/app
-ExecStart=/usr/bin/java -jar /home/ubuntu/app/app.jar --spring.config.location=/home/ubuntu/app/application.properties
+User=ec2-user
+WorkingDirectory=/home/ec2-user/app
+ExecStart=/usr/bin/java -jar /home/ec2-user/app/app.jar --spring.config.location=/home/ec2-user/app/application.properties
 SuccessExitStatus=143
 Restart=always
 RestartSec=10
@@ -95,9 +91,13 @@ RestartSec=10
 WantedBy=multi-user.target
 EOL'
 
+                # Reload systemd, enable and start the service
                 sudo systemctl daemon-reload
                 sudo systemctl enable springboot-app
                 sudo systemctl restart springboot-app
+                
+                # Check service status
+                sudo systemctl status springboot-app --no-pager
 ENDSSH
                 """
             }
@@ -110,6 +110,7 @@ ENDSSH
         }
         success {
             echo 'Pipeline succeeded! Application deployed on EC2.'
+            echo "Access your application at: http://${EC2_IP}:8080"
         }
         failure {
             echo 'Pipeline failed! Check logs.'
