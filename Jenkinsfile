@@ -11,7 +11,7 @@ pipeline {
 
         // EC2 details - Amazon Linux with ec2-user
         EC2_USER = "ec2-user"  // Changed from ubuntu to ec2-user
-        EC2_IP   = "65.1.86.61"
+        EC2_IP   = "65.0.93.50"
         EC2_APP_DIR = "/home/ec2-user/app"  // Changed path for ec2-user
 
         // Database details (RDS)
