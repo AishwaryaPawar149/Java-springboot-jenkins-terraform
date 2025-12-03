@@ -1,119 +1,119 @@
 pipeline {
     agent any
-
+    
     environment {
-        // Project details
-        PROJECT_NAME = "E-commerce-project-springBoot"
         GITHUB_REPO_URL = "https://github.com/AishwaryaPawar149/Java-springboot-jenkins-terraform.git"
-        
-        // Spring Boot project directory
-        APP_DIR = "JtProject"  // The subdirectory containing pom.xml
-
-        // EC2 details - Amazon Linux with ec2-user
-        EC2_USER = "ec2-user"  // Changed from ubuntu to ec2-user
-        EC2_IP   = "65.0.93.50"
-        EC2_APP_DIR = "/home/ec2-user/app"  // Changed path for ec2-user
-
-        // Database details (RDS)
-        DB_NAME = "ecommjava"
-        DB_USER = "admin"
-        DB_PASS = "Admin123"
-        DB_ENDPOINT = "terraform-20251202122328798100000001.cdwkuiksmrsm.ap-south-1.rds.amazonaws.com:3306"
+        GIT_BRANCH      = "master"
+        SSH_CRED_ID     = "terraform"  // तुमची existing credential ID
+        EC2_IP          = "13.233.148.82"  // तुमचा EC2 IP
+        REMOTE_USER     = "ubuntu"  // Amazon Linux साठी
+        APP_PATH        = "/opt/springboot-app"
+        PROJECT_DIR     = "JtProject"
     }
-
+    
     stages {
-        stage('Checkout') {
+        stage('Checkout Code') {
             steps {
-                git url: "${GITHUB_REPO_URL}", branch: 'master'
+                echo "🔄 Cloning ${GITHUB_REPO_URL} (branch: ${GIT_BRANCH})"
+                git url: "${GITHUB_REPO_URL}", branch: "${GIT_BRANCH}", credentialsId: "${SSH_CRED_ID}"
             }
         }
-
-        stage('Build') {
+        
+        stage('Build with Maven') {
             steps {
-                dir("${APP_DIR}") {  // Change to the Spring Boot project directory
-                    sh 'mvn clean package'
+                echo "🔨 Running Maven Build in ${PROJECT_DIR}..."
+                dir("${PROJECT_DIR}") {
+                    sh "mvn -B clean package -DskipTests"
+                }
+            }
+            post {
+                success {
+                    echo "📦 Archiving artifacts..."
+                    archiveArtifacts artifacts: "${PROJECT_DIR}/target/*.jar", fingerprint: true
                 }
             }
         }
-
-        stage('Test') {
+        
+        stage('Run Tests') {
             steps {
-                dir("${APP_DIR}") {  // Change to the Spring Boot project directory
-                    sh 'mvn test'
+                echo "🧪 Running Tests..."
+                dir("${PROJECT_DIR}") {
+                    sh "mvn test"
                 }
             }
         }
-
-        stage('Prepare application.properties') {
+        
+        stage('Deploy to EC2') {
             steps {
-                dir("${APP_DIR}") {  // Stay in the project directory
+                echo "🚀 Deploying application to EC2: ${EC2_IP}"
+                sshagent(credentials: [SSH_CRED_ID]) {
+                    script {
+                        // JAR file find करा
+                        def jarFile = sh(
+                            script: "ls ${PROJECT_DIR}/target/*.jar 2>/dev/null | grep -v 'sources.jar' | head -n 1 || true", 
+                            returnStdout: true
+                        ).trim()
+                        
+                        if (!jarFile) {
+                            error "❌ No JAR file found in ${PROJECT_DIR}/target"
+                        }
+                        
+                        echo "✅ JAR Found: ${jarFile}"
+                        
+                        // Remote directory create करा
+                        sh """
+                            ssh -o StrictHostKeyChecking=no ${REMOTE_USER}@${EC2_IP} \
+                            'sudo mkdir -p ${APP_PATH} && sudo chown ${REMOTE_USER}:${REMOTE_USER} ${APP_PATH}'
+                        """
+                        
+                        // JAR file copy करा
+                        sh """
+                            scp -o StrictHostKeyChecking=no "${jarFile}" \
+                            ${REMOTE_USER}@${EC2_IP}:"${APP_PATH}/app.jar"
+                        """
+                        
+                        // Application restart करा
+                        sh """
+                            ssh -o StrictHostKeyChecking=no ${REMOTE_USER}@${EC2_IP} \
+                            'sudo systemctl restart springboot-app.service || echo "Service restart failed"'
+                        """
+                        
+                        // Status check करा
+                        sh """
+                            ssh -o StrictHostKeyChecking=no ${REMOTE_USER}@${EC2_IP} \
+                            'sudo systemctl status springboot-app.service --no-pager || true'
+                        """
+                    }
+                }
+            }
+        }
+        
+        stage('Health Check') {
+            steps {
+                echo "🏥 Checking application health..."
+                script {
+                    sleep(time: 15, unit: 'SECONDS')
                     sh """
-                    mkdir -p deploy
-                    echo "spring.datasource.url=jdbc:mysql://${DB_ENDPOINT}/${DB_NAME}?createDatabaseIfNotExist=true" > deploy/application.properties
-                    echo "spring.datasource.username=${DB_USER}" >> deploy/application.properties
-                    echo "spring.datasource.password=${DB_PASS}" >> deploy/application.properties
-                    echo "spring.jpa.hibernate.ddl-auto=update" >> deploy/application.properties
+                        curl -f http://${EC2_IP}:8080/actuator/health || \
+                        curl -f http://${EC2_IP}:8080 || \
+                        echo "⚠️  Health check endpoint not responding yet"
                     """
                 }
             }
         }
-
-        stage('Deploy to EC2') {
-            steps {
-                sh """
-                # Create app directory on EC2
-                ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_IP} "mkdir -p ${EC2_APP_DIR}"
-
-                # Copy JAR and application.properties from the correct directory
-                scp -o StrictHostKeyChecking=no ${APP_DIR}/target/*.jar ${EC2_USER}@${EC2_IP}:${EC2_APP_DIR}/app.jar
-                scp -o StrictHostKeyChecking=no ${APP_DIR}/deploy/application.properties ${EC2_USER}@${EC2_IP}:${EC2_APP_DIR}/application.properties
-
-                # Install Java and setup systemd service on Amazon Linux
-                ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_IP} <<'ENDSSH'
-                # Install Java 11 on Amazon Linux
-                sudo yum install java-11-amazon-corretto -y || sudo yum install java-11-openjdk -y
-
-                # Create systemd service for Spring Boot app
-                sudo bash -c 'cat > /etc/systemd/system/springboot-app.service <<EOL
-[Unit]
-Description=Spring Boot E-commerce App
-After=network.target
-
-[Service]
-User=ec2-user
-WorkingDirectory=/home/ec2-user/app
-ExecStart=/usr/bin/java -jar /home/ec2-user/app/app.jar --spring.config.location=/home/ec2-user/app/application.properties
-SuccessExitStatus=143
-Restart=always
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-EOL'
-
-                # Reload systemd, enable and start the service
-                sudo systemctl daemon-reload
-                sudo systemctl enable springboot-app
-                sudo systemctl restart springboot-app
-                
-                # Check service status
-                sudo systemctl status springboot-app --no-pager
-ENDSSH
-                """
-            }
-        }
     }
-
+    
     post {
-        always {
-            cleanWs()
-        }
         success {
-            echo 'Pipeline succeeded! Application deployed on EC2.'
-            echo "Access your application at: http://${EC2_IP}:8080"
+            echo '🎉 Pipeline SUCCESS!'
+            echo "🌐 Application URL: http://${EC2_IP}:8080"
         }
         failure {
-            echo 'Pipeline failed! Check logs.'
+            echo '❌ Pipeline FAILED - Check console output'
+        }
+        always {
+            echo "🧹 Cleaning workspace..."
+            deleteDir()
         }
     }
 }
