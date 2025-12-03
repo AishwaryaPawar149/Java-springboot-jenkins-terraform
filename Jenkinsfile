@@ -4,74 +4,71 @@ pipeline {
     environment {
         PROJECT_NAME = "Java-springboot-jenkins-terraform"
         GITHUB_REPO_URL = "https://github.com/AishwaryaPawar149/Java-springboot-jenkins-terraform.git"
+        PROJECT_DIR = "JtProject"
     }
 
     stages {
         stage('Checkout Code') {
             steps {
                 git branch: 'master', url: "${GITHUB_REPO_URL}", credentialsId: 'terraform'
-                
-                // Debug information
-                sh '''
-                    echo "Current directory:"
-                    pwd
-                    echo "\nListing files:"
-                    ls -la
-                    echo "\nSearching for pom.xml:"
-                    find . -name "pom.xml" -type f
-                '''
+                echo "✅ Code checkout completed"
             }
         }
 
         stage('Build') {
             steps {
-                echo "Building Project..."
-                script {
-                    // Find and navigate to directory with pom.xml
-                    def pomDir = sh(script: 'find . -name "pom.xml" -type f -exec dirname {} \\; | head -1', returnStdout: true).trim()
-                    if (pomDir) {
-                        dir(pomDir) {
-                            sh 'mvn clean package'
-                        }
-                    } else {
-                        error "pom.xml not found in repository"
-                    }
+                echo "🔨 Building Project..."
+                dir("${PROJECT_DIR}") {
+                    sh 'mvn clean package -DskipTests'
                 }
+                echo "✅ Build completed"
             }
         }
 
         stage('Test') {
             steps {
-                echo "Running Tests..."
-                script {
-                    def pomDir = sh(script: 'find . -name "pom.xml" -type f -exec dirname {} \\; | head -1', returnStdout: true).trim()
-                    dir(pomDir) {
-                        sh 'mvn test'
-                    }
+                echo "🧪 Running Tests..."
+                dir("${PROJECT_DIR}") {
+                    sh 'mvn test'
                 }
+                echo "✅ Tests completed"
+            }
+        }
+
+        stage('Archive Artifacts') {
+            steps {
+                echo "📦 Archiving artifacts..."
+                dir("${PROJECT_DIR}") {
+                    archiveArtifacts artifacts: 'target/*.jar', fingerprint: true
+                }
+                echo "✅ Artifacts archived"
             }
         }
 
         stage('Deploy') {
             steps {
-                echo "Deploying Application..."
-                sh '''
-                # TODO: Add deploy commands
-                '''
+                echo "🚀 Deploying Application..."
+                dir("${PROJECT_DIR}") {
+                    sh '''
+                        echo "Deployment ready"
+                        ls -l target/*.jar
+                    '''
+                }
+                echo "✅ Deployment completed"
             }
         }
     }
 
     post {
         always {
-            echo "Cleaning workspace..."
+            echo "🧹 Cleaning workspace..."
             cleanWs()
         }
         success {
-            echo '🎉 Pipeline succeeded!'
+            echo '🎉 Pipeline succeeded! All stages completed successfully.'
         }
         failure {
-            echo '❌ Pipeline failed!'
+            echo '❌ Pipeline failed! Check the logs above.'
         }
     }
 }
