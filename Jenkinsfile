@@ -5,8 +5,8 @@ pipeline {
         GITHUB_REPO_URL = "https://github.com/AishwaryaPawar149/Java-springboot-jenkins-terraform.git"
         GIT_BRANCH      = "master"
         SSH_CRED_ID     = "terraform"  // तुमची existing credential ID
-        EC2_IP          = "13.201.10.86"  // तुमचा EC2 IP
-        REMOTE_USER     = "ec2-user"  // Amazon Linux साठी
+        EC2_IP          = "13.233.148.82"  // तुमचा EC2 IP
+        REMOTE_USER     = "ubuntu"  // Amazon Linux साठी
         APP_PATH        = "/opt/springboot-app"
         PROJECT_DIR     = "JtProject"
     }
