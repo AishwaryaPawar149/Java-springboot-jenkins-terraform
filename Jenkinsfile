@@ -5,7 +5,7 @@ pipeline {
         GITHUB_REPO_URL = "https://github.com/AishwaryaPawar149/Java-springboot-jenkins-terraform.git"
         GIT_BRANCH      = "master"
         SSH_CRED_ID     = "terraform"
-        EC2_IP          = "13.201.56.92"   // Updated IP
+        EC2_IP          = "13.201.56.92"
         REMOTE_USER     = "ubuntu"
         JAR_NAME        = "application.jar"
     }
@@ -15,6 +15,12 @@ pipeline {
         stage('Checkout Code') {
             steps {
                 git branch: "${GIT_BRANCH}", url: "${GITHUB_REPO_URL}"
+            }
+        }
+
+        stage('Set Executable Permission') {
+            steps {
+                sh 'chmod +x mvnw'
             }
         }
         
