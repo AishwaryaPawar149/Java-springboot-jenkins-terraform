@@ -7,25 +7,48 @@ pipeline {
     }
 
     stages {
-
         stage('Checkout Code') {
             steps {
-                // Using credentials 'terraform' (make sure it exists in Jenkins)
                 git branch: 'master', url: "${GITHUB_REPO_URL}", credentialsId: 'terraform'
+                
+                // Debug information
+                sh '''
+                    echo "Current directory:"
+                    pwd
+                    echo "\nListing files:"
+                    ls -la
+                    echo "\nSearching for pom.xml:"
+                    find . -name "pom.xml" -type f
+                '''
             }
         }
 
         stage('Build') {
             steps {
                 echo "Building Project..."
-                sh 'mvn clean package'
+                script {
+                    // Find and navigate to directory with pom.xml
+                    def pomDir = sh(script: 'find . -name "pom.xml" -type f -exec dirname {} \\; | head -1', returnStdout: true).trim()
+                    if (pomDir) {
+                        dir(pomDir) {
+                            sh 'mvn clean package'
+                        }
+                    } else {
+                        error "pom.xml not found in repository"
+                    }
+                }
             }
         }
 
         stage('Test') {
             steps {
                 echo "Running Tests..."
-                sh 'mvn test'
+                script {
+                    def pomDir = sh(script: 'find . -name "pom.xml" -type f -exec dirname {} \\; | head -1', returnStdout: true).trim()
+                    dir(pomDir) {
+                        sh 'mvn test'
+                    }
+                }
             }
         }
 
@@ -33,10 +56,7 @@ pipeline {
             steps {
                 echo "Deploying Application..."
                 sh '''
-                # TODO: Add deploy commands here
-                # Example (if using EC2):
-                # scp -o StrictHostKeyChecking=no target/*.jar ubuntu@<EC2-IP>:/home/ubuntu/
-                # ssh ubuntu@<EC2-IP> "nohup java -jar /home/ubuntu/*.jar &"
+                # TODO: Add deploy commands
                 '''
             }
         }
